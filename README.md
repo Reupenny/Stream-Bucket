@@ -7,10 +7,11 @@ Stream Bucket is a powerful macOS desktop application designed to bypass expensi
 
 ## 🚀 Key Features
 
-•	**Batch HLS Processing:** Effortlessly convert libraries of raw video files into web-ready HTTP Live Streaming (HLS) formats for seamless adaptive playback.
-•	**Direct-to-S3 Broadcasting:** Connect OBS or your favorite encoder to Stream Bucket to broadcast live streams directly to your cloud storage.
-•	**Built-in Asset Management:** Browse, upload, or delete files on your storage bucket directly from the app.
-•	**Instant CDN Integration:** Generate and copy production-ready CDN URLs for your files with a single click, making web embedding incredibly fast.
+* **Batch HLS Processing:** Effortlessly convert libraries of raw video files into web-ready HTTP Live Streaming (HLS) formats for seamless adaptive playback.
+* **Direct-to-S3 Broadcasting:** Connect OBS or your favorite encoder to Stream Bucket to broadcast live streams directly to your cloud storage.
+* **Built-in Asset Management:** Browse, upload, or delete files on your storage bucket directly from the app.
+* **Instant CDN Integration:** Generate and copy production-ready CDN URLs for your files with a single click, making web embedding incredibly fast.
+
 Why Stream Bucket? It turns your cheap cloud storage into a fully functioning, private live-streaming and video-hosting platform. No monthly platform fees, no viewer limits, and 100% control over your data.
 
 ### VOD Processing
