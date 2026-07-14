@@ -1,26 +1,23 @@
 # Stream Bucket
 
-![Stream Bucket Icon](icon/icon.png)
+<img src="icon/icon.png" alt="Stream Bucket Icon" width="25%" />
 
-A macOS application for batch processing video files into HLS streams with optional S3 upload and Cloudflare CDN integration.
+**Take complete control of your video delivery pipeline—locally.**
+Stream Bucket is a powerful macOS desktop application designed to bypass expensive Online Video Platforms (OVPs) like Dacast, Vimeo Live, and YoloCast. By leveraging your own S3 storage, Stream Bucket gives you total ownership of your media, streaming, and CDN costs.
 
-## Overview
+## 🚀 Key Features
 
-This application provides a complete solution for:
-
-- **VOD Processing**: Convert video files to HLS format with multiple bitrate renditions
-- **Live Streaming**: Capture and encode live streams with automatic HLS output
-- **S3 Integration**: Direct upload to S3-compatible storage (Backblaze B2, AWS S3, etc.)
-- **Cloudflare CDN**: Stream content through Cloudflare's global CDN network
-
-## Features
+•	**Batch HLS Processing:** Effortlessly convert libraries of raw video files into web-ready HTTP Live Streaming (HLS) formats for seamless adaptive playback.
+•	**Direct-to-S3 Broadcasting:** Connect OBS or your favorite encoder to Stream Bucket to broadcast live streams directly to your cloud storage.
+•	**Built-in Asset Management:** Browse, upload, or delete files on your storage bucket directly from the app.
+•	**Instant CDN Integration:** Generate and copy production-ready CDN URLs for your files with a single click, making web embedding incredibly fast.
+Why Stream Bucket? It turns your cheap cloud storage into a fully functioning, private live-streaming and video-hosting platform. No monthly platform fees, no viewer limits, and 100% control over your data.
 
 ### VOD Processing
 
 - Multi-resolution encoding (1080p, 720p, 480p, 240p)
 - Automatic thumbnail generation
 - Sprite sheet creation
-- VTT subtitle generation
 - Master playlist generation
 
 ### Live Streaming
@@ -28,14 +25,15 @@ This application provides a complete solution for:
 - RTMP ingest with HLS output
 - Multiple bitrate adaptive streaming
 - Automatic segment upload to S3
-- Real-time monitoring and statistics
 
 ### S3 Integration
 
 - Support for S3-compatible storage providers
 - Backblaze B2, AWS S3, DigitalOcean Spaces, etc.
 - Secure credential storage via macOS Keychain
-- Background upload during processing
+- Background upload during processing *Still in production
+
+[![Buy Me A Coffee](<https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=reubdavern&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff>)](https://www.buymeacoffee.com/reubdavern)
 
 ## Prerequisites
 
