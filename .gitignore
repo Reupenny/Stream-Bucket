@@ -1,0 +1,54 @@
+# Build artifacts
+*.app
+*.app.dSYM
+*.swp
+*.swo
+*~
+
+# Build script output
+Stream\ Bucket.app/
+
+# Log files
+*.log
+hls-live-log.txt
+
+# Lock files
+*.lock
+Icon.af~lock~
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon backup files
+Icon.af~
+
+# IDE files
+.vscode/
+.idea/
+*.xcuserdatad/
+
+# Keychain sensitive data (if ever committed)
+keychain-*
+
+# Temporary files
+*.tmp
+*.temp
+*.partial
+
+# Backup files
+*.bak
+*.backup
+
+# OS generated files
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project-specific
+# Add any additional files to ignore here
+/build
+/versions
