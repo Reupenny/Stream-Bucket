@@ -60,6 +60,12 @@ You need an S3-compatible storage account:
 - DNS zone configured in Cloudflare
 - Bucket configured as a Cloudflare R2 bucket or S3 origin
 
+## Release
+
+Get it on the relase page or build it following the instructions below.
+
+[Release Page](https://github.com/Reupenny/Stream-Bucket/releases)
+
 ## Building the Application
 
 ### Build Script
