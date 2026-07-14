@@ -1,5 +1,7 @@
 # Stream Bucket
 
+![Stream Bucket Icon](icon/icon.png)
+
 A macOS application for batch processing video files into HLS streams with optional S3 upload and Cloudflare CDN integration.
 
 ## Overview
@@ -65,7 +67,7 @@ You need an S3-compatible storage account:
 ### Build Script
 
 ```bash
-./build.sh
+./build.sh #{Version}
 ```
 
 This will:
@@ -232,7 +234,7 @@ For batch processing and uploading:
 3. Select your configured S3 profile
 4. Start processing - files will upload automatically
 
-## S3 Profile Configuration Details
+## S3 Profile C onfiguration Details
 
 ### Required Fields
 

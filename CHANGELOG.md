@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Description |
 |---------|------|-------------|
-| 1.0.0 | 2024 | Initial release |
+| 1.0.0 | 2026 | Initial release |
 | Unreleased | Current | Documentation and setup guides |
 
 ---

@@ -7,7 +7,7 @@ VERSION="${1:-1.0}"
 APP_NAME="Stream Bucket"
 APP_ID="com.developername.streambucket" 
 DEVELOPER_NAME="Reuben Davern"
-DEVELOPER_WEBSITE="https://www.reubendavern.com"
+DEVELOPER_WEBSITE="https://reubendavern.com"
 COPYRIGHT_YEAR=$(date +%Y)
 
 # Path to your custom DMG background image (Recommended size: 600x400 px)
