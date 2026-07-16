@@ -1,8 +1,7 @@
 # Stream Bucket
 
-<img src="icon/icon.png" alt="Stream Bucket Icon" width="25%" />
+<img alt="Stream Bucket Icon" src="icon/Stream Bucket feature.png" width="75%">
 
-**Take complete control of your video delivery pipeline—locally.**
 Stream Bucket is a powerful macOS desktop application designed to bypass expensive Online Video Platforms (OVPs) like Dacast, Vimeo Live, and YoloCast. By leveraging your own S3 storage, Stream Bucket gives you total ownership of your media, streaming, and CDN costs.
 
 ## 🚀 Key Features
