@@ -193,7 +193,11 @@ class LiveServerProcess: ObservableObject {
                 let basePath = liveFolder.isEmpty ? listenKey : "\(liveFolder)/\(listenKey)"
                 
                 appendLog(level: "INFO", thread: "S3", message: "S3 upload enabled → s3://\(profile.bucket)/\(basePath)/")
-                startBackgroundUploader(dir: hlsDir, uploader: uploader, basePath: basePath, bufferSegments: state.liveBufferSegments)
+                s3UploaderTask = uploader.startWatching(dir: hlsDir, basePath: basePath, bufferSegments: state.liveBufferSegments, sourceComplete: { false }) { msg in
+                    Task { @MainActor in
+                        self.appendLog(level: "INFO", thread: "S3", message: msg)
+                    }
+                }
             }
         } catch {
             appendLog(level: "ERROR", thread: "Main", message: "Failed to start FFmpeg: \(error.localizedDescription)")
@@ -251,85 +255,6 @@ class LiveServerProcess: ObservableObject {
                 else if line.lowercased().contains("warning") { level = "WARN" }
                 else { level = "INFO" }
                 appendLog(level: level, thread: "FFmpeg", message: trimmed)
-            }
-        }
-    }
-    
-    /// Upload segments to S3 in the correct order.
-    /// - bufferSegments: How many .ts segments must exist before we start uploading .m3u8 playlists.
-    ///   This prevents the player from seeing a playlist entry before the segment file is live.
-    private func startBackgroundUploader(dir: URL, uploader: S3Uploader, basePath: String, bufferSegments: Int = 3) {
-        s3UploaderTask = Task {
-            var uploadedTsFiles = Set<String>()
-            var m3u8UploadedAt = [String: Date]()   // track last upload time per m3u8
-            let fm = FileManager.default
-            
-            await MainActor.run {
-                appendLog(level: "INFO", thread: "S3", message: "Background uploader started (buffer: \(bufferSegments) segments)...")
-            }
-            
-            while !Task.isCancelled {
-                do {
-                    let allFiles = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
-                    
-                    // Only process fully written .ts files (not .tmp)
-                    let tsFiles  = allFiles.filter { $0.hasSuffix(".ts") }.sorted()
-                    let m3u8Files = allFiles.filter { $0.hasSuffix(".m3u8") }.sorted()
-                    
-                    // Step 1 — upload any new .ts segments
-                    for file in tsFiles {
-                        guard !uploadedTsFiles.contains(file) else { continue }
-                        if Task.isCancelled { break }
-                        let fileURL = dir.appendingPathComponent(file)
-                        let s3Key   = basePath.isEmpty ? file : "\(basePath)/\(file)"
-                        do {
-                            try await uploader.client.putObject(path: s3Key, fileURL: fileURL, contentType: "video/MP2T")
-                            uploadedTsFiles.insert(file)
-                            await MainActor.run {
-                                self.appendLog(level: "INFO", thread: "S3", message: "↑ \(file) → \(s3Key)")
-                            }
-                        } catch {
-                            await MainActor.run {
-                                self.appendLog(level: "WARN", thread: "S3", message: "Upload failed \(file): \(error.localizedDescription)")
-                            }
-                        }
-                    }
-                    
-                    // Step 2 — upload .m3u8 playlists only after buffer has been satisfied
-                    // i.e. once we have uploaded at least `bufferSegments` .ts files
-                    let tsUploaded = uploadedTsFiles.count
-                    if tsUploaded >= bufferSegments {
-                        for file in m3u8Files {
-                            if Task.isCancelled { break }
-                            let fileURL = dir.appendingPathComponent(file)
-                            let s3Key   = basePath.isEmpty ? file : "\(basePath)/\(file)"
-                            
-                            // Throttle m3u8 uploads: upload at most once per segment length cycle
-                            // but always upload if the file has changed recently
-                            let lastUpload = m3u8UploadedAt[file] ?? .distantPast
-                            let timeSinceLastUpload = Date().timeIntervalSince(lastUpload)
-                            guard timeSinceLastUpload >= 1.5 else { continue } // upload at most every 1.5s
-                            
-                            do {
-                                try await uploader.client.putObject(path: s3Key, fileURL: fileURL, contentType: "application/vnd.apple.mpegurl")
-                                m3u8UploadedAt[file] = Date()
-                                await MainActor.run {
-                                    self.appendLog(level: "INFO", thread: "S3", message: "↑ \(file) → \(s3Key)")
-                                }
-                            } catch {
-                                await MainActor.run {
-                                    self.appendLog(level: "WARN", thread: "S3", message: "Playlist upload failed \(file): \(error.localizedDescription)")
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s poll
-            }
-            
-            await MainActor.run {
-                appendLog(level: "INFO", thread: "S3", message: "Background uploader stopped.")
             }
         }
     }

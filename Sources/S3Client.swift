@@ -36,6 +36,13 @@ struct S3Object: Identifiable {
     }
 }
 
+/// Result of a paginated `listObjects` call.
+struct S3ListResult {
+    let objects: [S3Object]
+    let isTruncated: Bool
+    let nextContinuationToken: String?
+}
+
 class S3Client {
     let endpoint: String   // bare host e.g. "s3.us-west-004.backblazeb2.com"
     let bucket: String
@@ -171,6 +178,18 @@ class S3Client {
         try await execute(method: "HEAD", path: "/", payload: nil)
     }
 
+    /// Returns `true` if an object exists at the given key (HTTP 200 to a HEAD
+    /// request), `false` if it returns 404. Any other status is re-thrown.
+    func objectExists(path: String) async throws -> Bool {
+        do {
+            _ = try await execute(method: "HEAD", path: path, payload: nil)
+            return true
+        } catch let S3Error.requestFailed(statusCode: code, message: msg) {
+            if code == 404 { return false }
+            throw S3Error.requestFailed(statusCode: code, message: msg)
+        }
+    }
+
     func putObject(path: String, fileURL: URL, contentType: String) async throws {
         let fileData = try Data(contentsOf: fileURL)
         try await execute(method: "PUT", path: path, payload: fileData, contentType: contentType)
@@ -198,23 +217,31 @@ class S3Client {
     }
 
     /// List objects using delimiter to get virtual folders at the given prefix.
-    func listObjects(prefix: String = "") async throws -> [S3Object] {
+    /// - Parameters:
+    ///   - prefix: key prefix to scope the listing to (a "folder").
+    ///   - continuationToken: when provided, fetches the next page of a truncated listing.
+    ///   - maxKeys: maximum number of keys per page (default 1000, the S3 maximum).
+    func listObjects(prefix: String = "", continuationToken: String? = nil, maxKeys: Int = 1000) async throws -> S3ListResult {
         var items: [URLQueryItem] = [
             URLQueryItem(name: "list-type",  value: "2"),
-            URLQueryItem(name: "max-keys",   value: "1000"),
+            URLQueryItem(name: "max-keys",   value: "\(maxKeys)"),
             URLQueryItem(name: "delimiter",  value: "/"),
         ]
         if !prefix.isEmpty {
             items.append(URLQueryItem(name: "prefix", value: prefix))
+        }
+        if let token = continuationToken, !token.isEmpty {
+            items.append(URLQueryItem(name: "continuation-token", value: token))
         }
 
         let data = try await execute(method: "GET", path: "/", queryItems: items, payload: nil)
         return parseListObjectsXML(data)
     }
 
-    private func parseListObjectsXML(_ data: Data) -> [S3Object] {
+    private func parseListObjectsXML(_ data: Data) -> S3ListResult {
         let parser = S3ListXMLParser(data: data)
-        return parser.parse()
+        let (objects, isTruncated, nextToken) = parser.parse()
+        return S3ListResult(objects: objects, isTruncated: isTruncated, nextContinuationToken: nextToken)
     }
 }
 
@@ -230,18 +257,23 @@ private class S3ListXMLParser: NSObject, XMLParserDelegate {
     private var currentElement  = ""
     private var inContents      = false
     private var inCommonPrefixes = false
+    // Pagination
+    private var isTruncated = false
+    private var nextContinuationToken: String?
 
     init(data: Data) { self.data = data }
 
-    func parse() -> [S3Object] {
+    /// Parses the listing and returns the objects along with pagination info.
+    func parse() -> ([S3Object], Bool, String?) {
         let p = XMLParser(data: data)
         p.delegate = self
         p.parse()
         // Sort: folders first, then files alphabetically
-        return objects.sorted {
+        let sorted = objects.sorted {
             if $0.isVirtualFolder != $1.isVirtualFolder { return $0.isVirtualFolder }
             return $0.key < $1.key
         }
+        return (sorted, isTruncated, nextContinuationToken)
     }
     
     /// Parse all objects (including nested) without virtual-folder grouping — used for recursive deletes.
@@ -273,6 +305,10 @@ private class S3ListXMLParser: NSObject, XMLParserDelegate {
         case "LastModified": currentModified += s
         case "Prefix":
             if inCommonPrefixes { currentKey += s }
+        case "IsTruncated":
+            isTruncated = (s.lowercased() == "true")
+        case "NextContinuationToken":
+            nextContinuationToken = s
         default: break
         }
     }

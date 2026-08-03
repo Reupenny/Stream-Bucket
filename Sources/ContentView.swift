@@ -125,10 +125,32 @@ struct ContentView: View {
                                     .frame(maxWidth: .infinity)
                                     
                                     if let profile = state.activeProfile {
-                                        Text("Bucket: \(profile.bucket)")
+                                        // Show the resolved destination path so the
+                                        // user can see exactly where files will land.
+                                        let bucketRoot = "s3://\(profile.bucket)"
+                                        let folder = profile.targetFolder.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                                        let custom = state.customS3Path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                                        let dest = [bucketRoot, folder, custom].filter { !$0.isEmpty }.joined(separator: "/")
+                                        Text(dest)
                                             .font(.caption)
                                             .foregroundColor(.secondary)
+                                            .textSelection(.enabled)
+                                        if !custom.isEmpty {
+                                            Text("+ custom path: \(custom)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
+                                    
+                                    // Optional additional path appended after the
+                                    // profile's target folder, e.g. "2024/clients".
+                                    TextField("Optional additional path", text: $state.customS3Path)
+                                        .textFieldStyle(.roundedBorder)
+                                        .font(.caption)
+                                    
+                                    Toggle("Overwrite existing files without asking", isOn: $state.overwriteExisting)
+                                        .font(.caption)
+                                        .help("When off, you'll be asked before overwriting a destination that already exists.")
                                 }
                             }
                             .padding(12)
@@ -146,6 +168,7 @@ struct ContentView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .background(
@@ -170,6 +193,7 @@ struct ContentView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.blue))
@@ -178,6 +202,7 @@ struct ContentView: View {
                     Text("Add Folder")
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -188,6 +213,7 @@ struct ContentView: View {
                     Text(state.outputFolder != nil ? "Output: \(state.outputFolder!.lastPathComponent)" : "Select Local Output Folder")
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlColor)))
@@ -288,6 +314,7 @@ struct ContentView: View {
                     Label("Export Logs", systemImage: "doc.text")
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -297,6 +324,7 @@ struct ContentView: View {
                     Label("Retry Failed", systemImage: "arrow.triangle.2.circlepath")
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -306,6 +334,18 @@ struct ContentView: View {
         .padding(16)
         .background(Color(NSColor.underPageBackgroundColor))
         .cornerRadius(12)
+        .alert(item: $state.overwritePrompt) { prompt in
+            Alert(
+                title: Text("Destination already exists"),
+                message: Text("\"\(prompt.filename)\" already exists at:\n\(prompt.destination)\n\nDo you want to overwrite it?"),
+                primaryButton: .destructive(Text("Overwrite")) {
+                    resumeOverwrite(decision: true)
+                },
+                secondaryButton: .cancel(Text("Skip")) {
+                    resumeOverwrite(decision: false)
+                }
+            )
+        }
     }
     
     // MARK: - Helpers
@@ -316,6 +356,16 @@ struct ContentView: View {
         case "Processing", "Converting", "Uploading": return .primary
         case "Failed": return .red
         default: return .primary
+        }
+    }
+    
+    /// Resumes a pending overwrite confirmation with the user's decision and
+    /// clears the alert state.
+    private func resumeOverwrite(decision: Bool) {
+        state.overwritePrompt = nil
+        if let continuation = state.overwriteContinuation {
+            state.overwriteContinuation = nil
+            continuation.resume(returning: decision)
         }
     }
     

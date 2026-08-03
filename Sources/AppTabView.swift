@@ -52,6 +52,7 @@ struct AppTabView: View {
                             .background(selectedTab == index ? Color(.selectedContentBackgroundColor) : Color.clear)
                             .foregroundColor(selectedTab == index ? .white : (index == 2 && liveServer.isRunning ? .red : .primary))
                             .cornerRadius(5)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }

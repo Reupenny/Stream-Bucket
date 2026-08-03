@@ -6,6 +6,9 @@ struct BucketBrowserView: View {
 
     @State private var objects: [S3Object] = []
     @State private var isLoading = false
+    @State private var isLoadingMore = false
+    @State private var continuationToken: String?
+    @State private var hasMorePages = false
     @State private var errorMessage = ""
     @State private var prefix = ""
     @State private var prefixHistory: [String] = []
@@ -158,8 +161,10 @@ struct BucketBrowserView: View {
                                 Button(action: testConnection) {
                                     if isTestingConnection {
                                         ProgressView().scaleEffect(0.7).frame(width: 16, height: 16)
+                                            .contentShape(Rectangle())
                                     } else {
                                         Text("Test")
+                                            .contentShape(Rectangle())
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -168,12 +173,17 @@ struct BucketBrowserView: View {
                                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlColor)))
                                 .disabled(isTestingConnection)
 
-                                Button("Save") { saveProfile() }
-                                    .buttonStyle(.plain)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue))
+                                Button {
+                                    saveProfile()
+                                } label: {
+                                    Text("Save")
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue))
                                     .frame(maxWidth: .infinity)
                             }
 
@@ -223,6 +233,7 @@ struct BucketBrowserView: View {
                     Button(action: { Task { await deleteSelected() } }) {
                         Label("Delete Selected (\(checkedItems.count))", systemImage: "trash")
                             .padding(.horizontal, 8).padding(.vertical, 4)
+                                .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.8)))
@@ -233,6 +244,7 @@ struct BucketBrowserView: View {
                 Button(action: { uploadFiles(files: true, directories: false) }) {
                     Label("Upload File", systemImage: "arrow.up.doc")
                         .padding(.horizontal, 8).padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -241,6 +253,7 @@ struct BucketBrowserView: View {
                 Button(action: { uploadFiles(files: false, directories: true) }) {
                     Label("Upload Folder", systemImage: "folder.badge.plus")
                         .padding(.horizontal, 8).padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -249,6 +262,7 @@ struct BucketBrowserView: View {
                 Button(action: { Task { await refresh() } }) {
                     Image(systemName: "arrow.clockwise")
                         .padding(.horizontal, 8).padding(.vertical, 4)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
@@ -403,6 +417,30 @@ struct BucketBrowserView: View {
                             }
                         }
                     )
+
+                    // Pagination: load additional pages when the listing is truncated
+                    if hasMorePages {
+                        HStack(spacing: 8) {
+                            Spacer()
+                            if isLoadingMore {
+                                ProgressView().scaleEffect(0.8)
+                                Text("Loading more…").font(.caption).foregroundColor(.secondary)
+                            } else {
+                                Button {
+                                    Task { await loadMore() }
+                                } label: {
+                                    Label("Load More", systemImage: "arrow.down.circle")
+                                        .padding(.horizontal, 12).padding(.vertical, 6)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue))
+                                .foregroundColor(.white)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                    }
                 }
             }
             // Master URL quick-copy
@@ -424,14 +462,17 @@ struct BucketBrowserView: View {
                             .font(.caption)
                         }
                     }
-                    Button("Copy All") {
+                    Button {
                         let all = m3u8s.map { getURL(for: $0) }.joined(separator: "\n")
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(all, forType: .string)
+                    } label: {
+                        Text("Copy All")
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12).padding(.vertical, 6)
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue))
                 }
                 .padding(12)
@@ -517,12 +558,33 @@ struct BucketBrowserView: View {
         guard let c = client else { objects = []; return }
         isLoading = true
         errorMessage = ""
+        continuationToken = nil
+        hasMorePages = false
+        checkedItems.removeAll()
         do {
-            objects = try await c.listObjects(prefix: prefix)
+            let result = try await c.listObjects(prefix: prefix)
+            objects = result.objects
+            continuationToken = result.nextContinuationToken
+            hasMorePages = result.isTruncated
         } catch {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// Appends the next page of objects to the current listing.
+    private func loadMore() async {
+        guard let c = client, hasMorePages, let token = continuationToken, !isLoadingMore else { return }
+        isLoadingMore = true
+        do {
+            let result = try await c.listObjects(prefix: prefix, continuationToken: token)
+            objects.append(contentsOf: result.objects)
+            continuationToken = result.nextContinuationToken
+            hasMorePages = result.isTruncated
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoadingMore = false
     }
 
     private func navigateToRoot() {
@@ -535,6 +597,11 @@ struct BucketBrowserView: View {
         prefixHistory.append(prefix)
         prefix = newPrefix
         Task { await refresh() }
+    }
+
+    /// Clears the current selection set when the listing changes so stale ids don't linger.
+    private func clearSelection() {
+        checkedItems.removeAll()
     }
 
     private func deleteObject(_ obj: S3Object) async {

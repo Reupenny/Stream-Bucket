@@ -81,20 +81,20 @@ struct LiveStreamView: View {
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .background(RoundedRectangle(cornerRadius: 14).fill(server.isRunning ? Color.orange : Color.blue))
-                        .contentShape(Rectangle())
                         
                         Button(action: { server.stopServer() }) {
                             Text("Stop Server")
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .background(RoundedRectangle(cornerRadius: 14).fill(Color(NSColor.controlColor)))
-                        .contentShape(Rectangle())
                         .disabled(!server.isRunning)
                     }
                     
@@ -228,10 +228,10 @@ struct LiveStreamView: View {
                     Label("Export Logs", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 6)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlColor)))
-                .contentShape(Rectangle())
             }
             .padding()
         }

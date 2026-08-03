@@ -90,6 +90,12 @@ class ProcessorState: ObservableObject {
     // S3 Settings
     @AppStorage("enableS3Upload") var enableS3Upload: Bool = false
     @AppStorage("simultaneousMode") var simultaneousMode: Bool = false
+    /// When false, the convert+upload pipeline asks before overwriting an
+    /// existing destination. When true, existing files are overwritten silently.
+    @AppStorage("overwriteExisting") var overwriteExisting: Bool = false
+    /// Optional extra path segment appended after the profile's target folder,
+    /// e.g. "2024/clients" → s3://bucket/Videos/2024/clients/<file>/.
+    @AppStorage("customS3Path") var customS3Path: String = ""
     @Published var s3Profiles: [S3Profile] = [] {
         didSet { saveProfiles() }
     }
@@ -106,6 +112,20 @@ class ProcessorState: ObservableObject {
     }
     
     @Published var connectionTestResult: String = ""
+    
+    // Overwrite confirmation (convert+upload)
+    /// Set when a destination already exists and overwrite is not enabled. The
+    /// convert view shows an alert bound to this; `overwritePromptResponse` is
+    /// resumed by the alert's buttons to let the batch task continue or skip.
+    @Published var overwritePrompt: OverwritePrompt?
+    struct OverwritePrompt: Identifiable {
+        let id = UUID()
+        let destination: String
+        let filename: String
+    }
+    /// Continuation resumed by the overwrite alert's buttons. `true` = overwrite,
+    /// `false` = skip this file.
+    var overwriteContinuation: CheckedContinuation<Bool, Never>?
     
     // Progress and State
     @Published var isProcessing: Bool = false
