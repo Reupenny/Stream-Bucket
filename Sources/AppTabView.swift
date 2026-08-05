@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct AppTabView: View {
-    @StateObject private var state = ProcessorState()
-    @StateObject private var liveServer = LiveServerProcess()   // Persists across tab switches
+    @EnvironmentObject private var state: ProcessorState
+    @EnvironmentObject private var liveServer: LiveServerProcess
     @State private var selectedTab = 0
 
     private let tabs = [

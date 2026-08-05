@@ -6,6 +6,7 @@ struct LiveStreamView: View {
     @ObservedObject var server: LiveServerProcess
     
     @State private var showCreateSheet = false
+    @State private var showGlobalSettings = false
     
     var selectedStream: ScheduledStream? {
         state.scheduledStreams.first { $0.id == state.selectedStreamId }
@@ -41,6 +42,11 @@ struct LiveStreamView: View {
                 state.selectedStreamId = stream.id
             }
             .environmentObject(state)
+        }
+        .sheet(isPresented: $showGlobalSettings) {
+            LiveSettingsView()
+                .environmentObject(state)
+                .frame(width: 520, height: 600)
         }
     }
     
@@ -145,78 +151,27 @@ struct LiveStreamView: View {
                     
                     Divider()
                     
-                    // Streaming Resolutions
-                    GroupBox("Streaming Resolutions") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Selected resolutions will be encoded concurrently (requires higher CPU).")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Toggle("1080p (Full HD)", isOn: $state.enable1080p)
-                            Toggle("720p (HD)", isOn: $state.enable720p)
-                            Toggle("480p (SD)", isOn: $state.enable480p)
-                            Toggle("240p (Low)", isOn: $state.enable240p)
+                    // Dashboard navigation + global stream settings
+                    VStack(spacing: 8) {
+                        Button(action: { state.selectedStreamId = nil }) {
+                            Label("Dashboard", systemImage: "square.grid.2x2")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .contentShape(Rectangle())
                         }
-                        .padding(6)
-                    }
-                    
-                    GroupBox("HLS Segment Settings") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("Segment Length:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Stepper("\(state.liveSegmentLength)s", value: $state.liveSegmentLength, in: 2...10)
-                            }
-                            
-                            HStack {
-                                Text("Playlist Size:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Stepper(state.livePlaylistSize == 0 ? "Keep All" : "\(state.livePlaylistSize) segs", value: $state.livePlaylistSize, in: 0...60)
-                            }
-                            
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Buffer Segments:")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                    Text("Delay before playlist is published")
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary.opacity(0.7))
-                                }
-                                Spacer()
-                                Stepper("\(state.liveBufferSegments)", value: $state.liveBufferSegments, in: 1...10)
-                            }
+                        .buttonStyle(.plain)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+                        
+                        Button(action: { showGlobalSettings = true }) {
+                            Label("Global Stream Settings", systemImage: "gearshape")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 6)
+                                .padding(.horizontal, 10)
+                                .contentShape(Rectangle())
                         }
-                        .padding(6)
-                    }
-                    
-                    // S3 Recording Settings
-                    GroupBox("Recording Settings") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Destination Bucket:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Picker("", selection: $state.selectedProfileId) {
-                                    ForEach(state.s3Profiles) { profile in
-                                        Text(profile.name).tag(Optional(profile.id))
-                                    }
-                                }
-                                .labelsHidden()
-                                .frame(maxWidth: .infinity)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Base Folder Path:")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                TextField("/live_recordings", text: $state.liveS3Folder)
-                            }
-                        }
-                        .padding(6)
+                        .buttonStyle(.plain)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
                     }
                 }
                 .padding()
@@ -242,6 +197,7 @@ struct LiveStreamView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let stream = selectedStream {
                 StreamDetailView(stream: stream, server: server)
+                    .environmentObject(state)
             } else {
                 dashboardView
             }
@@ -257,8 +213,8 @@ struct LiveStreamView: View {
             HStack(spacing: 24) {
                 StatView(title: "Active Streams", value: "\(server.activeStreams)")
                 StatView(title: "Total Bitrate", value: server.totalBitrate)
-                StatView(title: "HLS Outputs", value: "\(server.activeHLSOutputs)")
-                StatView(title: "Viewers", value: "\(server.viewers)")
+                StatView(title: "Destinations", value: "\(server.activeDestinations)")
+                StatView(title: "Segments", value: "\(server.uploadedSegments)")
             }
             .padding(.vertical, 8)
             
@@ -280,7 +236,7 @@ struct LiveStreamView: View {
             } else if server.isRunning {
                 HStack(spacing: 10) {
                     ProgressView().scaleEffect(0.7)
-                    Text("Waiting for OBS or encoder to connect to rtmp://localhost:1935/live/stream")
+                    Text("Waiting for encoder to connect to rtmp://localhost:1935/live/stream")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -387,6 +343,7 @@ struct LiveStreamView: View {
     }
     
     // MARK: - Helpers
+    
     private func exportLogs() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "hls-live-log.txt"
@@ -456,6 +413,7 @@ private struct StreamRowView: View {
 
 // MARK: - Stream Detail View
 private struct StreamDetailView: View {
+    @EnvironmentObject var state: ProcessorState
     let stream: ScheduledStream
     let server: LiveServerProcess
     
@@ -496,7 +454,7 @@ private struct StreamDetailView: View {
                 // OBS Configuration
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("OBS / Streaming Software Configuration")
+                        Text("Streaming Software Configuration")
                             .font(.headline)
                         
                         Divider()
@@ -531,6 +489,14 @@ private struct StreamDetailView: View {
                     }
                     .padding(8)
                 }
+
+                // Per-stream settings (resolutions + segments)
+                StreamSettingsEditor(stream: stream)
+                    .environmentObject(state)
+
+                // Per-stream destinations (S3 + YouTube)
+                StreamDestinationsEditor(stream: stream)
+                    .environmentObject(state)
                 
                 // Embeddable URLs
                 GroupBox {
@@ -656,16 +622,46 @@ struct CreateStreamSheet: View {
                 Button("Create Stream") {
                     guard !title.isEmpty else { return }
                     let streamKey = generatedStreamKey
+                    let d = state.liveDefaults
+                    let settings = StreamSettings(
+                        enable1080p: d.enable1080p,
+                        enable720p: d.enable720p,
+                        enable480p: d.enable480p,
+                        enable240p: d.enable240p,
+                        segmentLength: d.segmentLength,
+                        playlistSize: d.playlistSize,
+                        bufferSegments: d.bufferSegments,
+                        recordToS3: d.recordToS3
+                    )
+                    // Default destination: S3 using the active profile + default folder.
+                    var destinations: [StreamDestination] = []
+                    if d.recordToS3 {
+                        destinations.append(StreamDestination(
+                            type: .s3,
+                            profileId: state.selectedProfileId,
+                            s3Folder: d.s3Folder
+                        ))
+                    }
+                    // Default YouTube destination when a key is configured.
+                    if !d.youtubeStreamKey.isEmpty {
+                        destinations.append(StreamDestination(
+                            type: .youtube,
+                            rtmpUrl: d.youtubeRtmpUrl,
+                            streamKey: d.youtubeStreamKey
+                        ))
+                    }
                     let stream = ScheduledStream(
                         title: title,
                         date: date,
                         streamKey: streamKey,
-                        cdnUrl: generatedCdnUrl
+                        cdnUrl: generatedCdnUrl,
+                        settings: settings,
+                        destinations: destinations
                     )
                     
                     // Pre-generate M3U8 files in the background
                     Task {
-                        await server.pregeneratePlaylists(state: state, streamKey: streamKey)
+                        await server.pregeneratePlaylists(state: state, stream: stream)
                     }
                     
                     onCreate(stream)
@@ -739,5 +735,171 @@ struct CopyButton: View {
         .buttonStyle(.plain)
         .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.2), value: copied)
+    }
+}
+
+// MARK: - Per-stream Settings Editor
+private struct StreamSettingsEditor: View {
+    @EnvironmentObject var state: ProcessorState
+    let stream: ScheduledStream
+
+    private var settings: Binding<StreamSettings> {
+        Binding(
+            get: { stream.settings },
+            set: { newVal in
+                if let idx = state.scheduledStreams.firstIndex(where: { $0.id == stream.id }) {
+                    state.scheduledStreams[idx].settings = newVal
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        GroupBox("Stream Settings") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Resolutions (encoded concurrently)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Toggle("1080p (Full HD)", isOn: settings.enable1080p)
+                Toggle("720p (HD)", isOn: settings.enable720p)
+                Toggle("480p (SD)", isOn: settings.enable480p)
+                Toggle("240p (Low)", isOn: settings.enable240p)
+
+                Divider()
+
+                HStack {
+                    Text("Segment Length:").font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    Stepper("\(settings.segmentLength.wrappedValue)s", value: settings.segmentLength, in: 2...10)
+                }
+                HStack {
+                    Text("Playlist Size:").font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    Stepper(settings.playlistSize.wrappedValue == 0 ? "Keep All" : "\(settings.playlistSize.wrappedValue) segs", value: settings.playlistSize, in: 0...60)
+                }
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Buffer Segments:").font(.caption).foregroundColor(.secondary)
+                        Text("Delay before playlist is published").font(.caption2).foregroundColor(.secondary.opacity(0.7))
+                    }
+                    Spacer()
+                    Stepper("\(settings.bufferSegments.wrappedValue)", value: settings.bufferSegments, in: 1...10)
+                }
+            }
+            .padding(6)
+        }
+    }
+}
+
+// MARK: - Per-stream Destinations Editor
+private struct StreamDestinationsEditor: View {
+    @EnvironmentObject var state: ProcessorState
+    let stream: ScheduledStream
+
+    private func binding(for dest: StreamDestination) -> Binding<StreamDestination> {
+        Binding(
+            get: { dest },
+            set: { newVal in
+                guard let idx = state.scheduledStreams.firstIndex(where: { $0.id == stream.id }) else { return }
+                if let dIdx = state.scheduledStreams[idx].destinations.firstIndex(where: { $0.id == dest.id }) {
+                    state.scheduledStreams[idx].destinations[dIdx] = newVal
+                }
+            }
+        )
+    }
+
+    var body: some View {
+        GroupBox("Destinations") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Where this stream is recorded/pushed. Add more later.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                ForEach(stream.destinations) { dest in
+                    DestinationRow(dest: binding(for: dest))
+                        .environmentObject(state)
+                }
+
+                Button(action: addDestination) {
+                    Label("Add Destination", systemImage: "plus.circle.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(6)
+        }
+    }
+
+    private func addDestination() {
+        guard let idx = state.scheduledStreams.firstIndex(where: { $0.id == stream.id }) else { return }
+        let newType: StreamDestination.DestType = state.scheduledStreams[idx].destinations.contains(where: { $0.type == .s3 })
+            ? .youtube : .s3
+        state.scheduledStreams[idx].destinations.append(StreamDestination(type: newType))
+    }
+}
+
+private struct DestinationRow: View {
+    @EnvironmentObject var state: ProcessorState
+    @Binding var dest: StreamDestination
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Picker("", selection: $dest.type) {
+                    ForEach(StreamDestination.DestType.allCases) { t in
+                        Text(t.rawValue).tag(t)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 160)
+
+                Spacer()
+
+                Button(action: remove) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+            }
+
+            switch dest.type {
+            case .s3:
+                HStack {
+                    Text("Profile:").font(.caption).foregroundColor(.secondary)
+                    Picker("", selection: $dest.profileId) {
+                        Text("None").tag(Optional<UUID>.none)
+                        ForEach(state.s3Profiles) { p in
+                            Text(p.name).tag(Optional(p.id))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                }
+                HStack {
+                    Text("Folder:").font(.caption).foregroundColor(.secondary)
+                    TextField("live_recordings", text: $dest.s3Folder)
+                        .textFieldStyle(.roundedBorder)
+                }
+            case .youtube:
+                HStack {
+                    Text("RTMP URL:").font(.caption).foregroundColor(.secondary)
+                    TextField("rtmp://a.rtmp.youtube.com/live2", text: $dest.rtmpUrl)
+                        .textFieldStyle(.roundedBorder)
+                }
+                HStack {
+                    Text("Stream Key:").font(.caption).foregroundColor(.secondary)
+                    TextField("xxxx-xxxx-xxxx-xxxx", text: $dest.streamKey)
+                        .textFieldStyle(.roundedBorder)
+                }
+            }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+    }
+
+    private func remove() {
+        guard let streamIdx = state.scheduledStreams.firstIndex(where: { $0.destinations.contains(where: { $0.id == dest.id }) }) else { return }
+        state.scheduledStreams[streamIdx].destinations.removeAll { $0.id == dest.id }
     }
 }

@@ -47,6 +47,56 @@ struct ScheduledStream: Identifiable, Codable, Hashable {
     var date: Date
     var streamKey: String
     var cdnUrl: String
+    /// Per-stream encoding + recording settings (defaults applied at creation).
+    var settings: StreamSettings = StreamSettings()
+    /// Destinations this stream is pushed to. At least one is required to record.
+    var destinations: [StreamDestination] = [StreamDestination(type: .s3)]
+}
+
+/// A single output destination for a live stream. More types can be added later.
+struct StreamDestination: Identifiable, Codable, Hashable {
+    var id = UUID()
+    enum DestType: String, Codable, CaseIterable, Identifiable {
+        case s3 = "S3 Bucket"
+        case youtube = "YouTube RTMP"
+        var id: String { rawValue }
+    }
+    var type: DestType
+    /// S3: profile id to use. YouTube: RTMP URL + stream key.
+    var profileId: UUID?
+    var rtmpUrl: String = ""
+    var streamKey: String = ""
+    /// S3 sub-folder appended after the profile's target folder.
+    var s3Folder: String = ""
+}
+
+/// Per-stream encoding + recording configuration.
+struct StreamSettings: Codable, Hashable {
+    var enable1080p: Bool = true
+    var enable720p: Bool = true
+    var enable480p: Bool = false
+    var enable240p: Bool = false
+    var segmentLength: Int = 6
+    var playlistSize: Int = 0      // 0 = keep all (VOD replayable)
+    var bufferSegments: Int = 3
+    var recordToS3: Bool = true
+}
+
+/// Global defaults for new streams, edited in the Live Settings window.
+struct LiveDefaults: Codable, Hashable {
+    var enable1080p: Bool = true
+    var enable720p: Bool = true
+    var enable480p: Bool = false
+    var enable240p: Bool = false
+    var segmentLength: Int = 6
+    var playlistSize: Int = 0
+    var bufferSegments: Int = 3
+    var recordToS3: Bool = true
+    /// Default S3 folder for new streams (profile is chosen per-destination).
+    var s3Folder: String = "live_recordings"
+    /// Default YouTube RTMP destination applied to new streams when a key is set.
+    var youtubeRtmpUrl: String = "rtmp://a.rtmp.youtube.com/live2"
+    var youtubeStreamKey: String = ""
 }
 
 enum EncodingPreset: String, CaseIterable, Identifiable {
@@ -86,6 +136,16 @@ class ProcessorState: ObservableObject {
     
     // Live Server Settings
     @AppStorage("liveS3Folder") var liveS3Folder: String = "/live_recordings"
+    /// Global defaults applied to new streams (edited in the Live Settings window).
+    @AppStorage("liveDefaults") var liveDefaultsData: Data = Data()
+    var liveDefaults: LiveDefaults {
+        get {
+            (try? JSONDecoder().decode(LiveDefaults.self, from: liveDefaultsData)) ?? LiveDefaults()
+        }
+        set {
+            liveDefaultsData = (try? JSONEncoder().encode(newValue)) ?? Data()
+        }
+    }
     
     // S3 Settings
     @AppStorage("enableS3Upload") var enableS3Upload: Bool = false
