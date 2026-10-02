@@ -53,6 +53,9 @@ struct AppTabView: View {
                             .foregroundColor(selectedTab == index ? .white : (index == 2 && liveServer.isRunning ? .red : .primary))
                             .cornerRadius(5)
                             .contentShape(Rectangle())
+                            // §1 Response: highlight the instant the tab is pressed.
+                            .scaleEffect(selectedTab == index ? 1.0 : 0.97, anchor: .center)
+                            .animation(DesignKit.motion(DesignKit.spring), value: selectedTab)
                         }
                         .buttonStyle(.plain)
                     }

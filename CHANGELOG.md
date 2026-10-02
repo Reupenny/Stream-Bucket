@@ -5,9 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.0.2] - 2026-10-02
 
 ### Added
+
+- Screenshot gallery in README covering the Convert, Upload, and Live tabs
+- `DesignKit` helpers for spring-based, interruptible motion that honours the
+  system Reduce Motion accessibility setting
+- `PressableButtonStyle` / `PressablePlainStyle` for instant press-down feedback
+  on buttons across the app
+- S3 `downloadObject` support for fetching bucket objects to a local file
 - Comprehensive README.md with project overview and usage instructions
 - Detailed SETUP.md with Cloudflare CDN + S3 configuration guides
 - Support for multiple S3-compatible storage providers (R2, B2, AWS S3)
@@ -15,11 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - VOD batch processing with multiple bitrate renditions
 - Secure credential storage via macOS Keychain
 - Thumbnail generation and sprite sheet creation
-- VTT subtitle generation
+
+### Changed
+
+- S3 Cloud File Explorer: added download and refresh affordances
+- Live view and bucket browser UI polish
+- Clarified README wording and restructured the S3 profile configuration section
 
 ## [1.0.0] - Initial Release
 
 ### Added
+
 - Stream Bucket macOS application
 - VOD processing with FFmpeg
 - S3 upload functionality
@@ -34,16 +47,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date | Description |
-|---------|------|-------------|
-| 1.0.0 | 2026 | Initial release |
-| Unreleased | Current | Documentation and setup guides |
+| Version    | Date       | Description                                |
+| ---------- | ---------- | ------------------------------------------ |
+| 1.0.2      | 2026-10-02 | Screenshots, motion/press-feel UI pass, S3 downloads |
+| 1.0.0      | 2026       | Initial release                            |
+| Unreleased | Current    | Documentation and setup guides             |
 
 ---
 
 ## Roadmap
 
 ### Planned Features
+
 - [ ] Web-based management interface
 - [ ] Scheduled streaming automation
 - [ ] Recording archive management

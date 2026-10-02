@@ -199,6 +199,70 @@ class S3Client {
         try await execute(method: "DELETE", path: path, payload: nil)
     }
 
+    func downloadObject(path: String, to destination: URL) async throws {
+        let safePath = path == "/" || path.isEmpty ? "" : "/" + (path.hasPrefix("/") ? String(path.dropFirst()) : path)
+        var urlComponents = URLComponents()
+        urlComponents.scheme = "https"
+        urlComponents.host   = endpoint
+        urlComponents.path   = "/\(bucket)\(safePath)"
+
+        guard let url = urlComponents.url else { throw S3Error.invalidURL("/\(bucket)\(safePath)") }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let date = Date()
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(abbreviation: "UTC")
+        dateFormatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        let amzDate   = dateFormatter.string(from: date)
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateStamp = dateFormatter.string(from: date)
+
+        let payloadHash = SHA256.hash(data: Data()).compactMap { String(format: "%02x", $0) }.joined()
+
+        request.setValue(endpoint,      forHTTPHeaderField: "host")
+        request.setValue(amzDate,       forHTTPHeaderField: "x-amz-date")
+        request.setValue(payloadHash,   forHTTPHeaderField: "x-amz-content-sha256")
+
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~")
+        let canonicalURI = url.path.isEmpty ? "/" : url.path.components(separatedBy: "/").map { $0.addingPercentEncoding(withAllowedCharacters: unreserved) ?? $0 }.joined(separator: "/")
+        
+        let canonicalHeaders = "host:\(endpoint)\nx-amz-content-sha256:\(payloadHash)\nx-amz-date:\(amzDate)\n"
+        let signedHeaders    = "host;x-amz-content-sha256;x-amz-date"
+
+        let canonicalRequest = ["GET", canonicalURI, "", canonicalHeaders, signedHeaders, payloadHash].joined(separator: "\n")
+        let canonicalRequestHash = SHA256.hash(data: Data(canonicalRequest.utf8)).compactMap { String(format: "%02x", $0) }.joined()
+
+        let credentialScope = "\(dateStamp)/\(region)/s3/aws4_request"
+        let stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequestHash].joined(separator: "\n")
+
+        let kSecret  = Data("AWS4\(secretKey)".utf8)
+        let kDate    = hmac(key: kSecret,  data: dateStamp)
+        let kRegion  = hmac(key: kDate,    data: region)
+        let kService = hmac(key: kRegion,  data: "s3")
+        let kSigning = hmac(key: kService, data: "aws4_request")
+        let signature = hmac(key: kSigning, data: stringToSign).compactMap { String(format: "%02x", $0) }.joined()
+
+        request.setValue(
+            "AWS4-HMAC-SHA256 Credential=\(accessKey)/\(credentialScope), SignedHeaders=\(signedHeaders), Signature=\(signature)",
+            forHTTPHeaderField: "Authorization"
+        )
+
+        let (tempURL, response) = try await URLSession.shared.download(for: request)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let bodyData = try? Data(contentsOf: tempURL)
+            let bodyStr = String(data: bodyData ?? Data(), encoding: .utf8) ?? "(no body)"
+            throw S3Error.requestFailed(statusCode: http.statusCode, message: bodyStr)
+        }
+        
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: tempURL, to: destination)
+    }
+
     /// Delete all objects whose key starts with the given prefix (used to "delete" a virtual folder).
     func deleteFolder(prefix: String) async throws {
         // List ALL objects under this prefix (no delimiter – recurse fully)

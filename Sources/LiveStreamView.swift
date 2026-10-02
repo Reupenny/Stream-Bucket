@@ -89,7 +89,7 @@ struct LiveStreamView: View {
                                 .padding(.vertical, 8)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .background(RoundedRectangle(cornerRadius: 14).fill(server.isRunning ? Color.orange : Color.blue))
                         
                         Button(action: { server.stopServer() }) {
@@ -99,7 +99,7 @@ struct LiveStreamView: View {
                                 .padding(.vertical, 8)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .background(RoundedRectangle(cornerRadius: 14).fill(Color(NSColor.controlColor)))
                         .disabled(!server.isRunning)
                     }
@@ -116,7 +116,7 @@ struct LiveStreamView: View {
                                 .foregroundColor(.blue)
                                 .font(.title3)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressablePlainStyle())
                     }
                     
                     if state.scheduledStreams.isEmpty {
@@ -160,7 +160,7 @@ struct LiveStreamView: View {
                                 .padding(.horizontal, 10)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
                         
                         Button(action: { showGlobalSettings = true }) {
@@ -170,7 +170,7 @@ struct LiveStreamView: View {
                                 .padding(.horizontal, 10)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
                     }
                 }
@@ -185,7 +185,7 @@ struct LiveStreamView: View {
                         .padding(.vertical, 6)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlColor)))
             }
             .padding()

@@ -155,8 +155,13 @@ struct ContentView: View {
                             }
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlBackgroundColor)))
+                            // §4 Behavior over animation: a spring makes the reveal
+                            // interruptible; §14 it collapses to nothing when reduced motion is on.
+                            .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
                         }
                     }
+                    // §4/§14 Spring-driven, reduced-motion-aware reveal of the upload options.
+                    .animation(DesignKit.motion(DesignKit.spring), value: state.enableS3Upload)
                 }
                 .padding()
             }
@@ -170,7 +175,7 @@ struct ContentView: View {
                     .padding(.vertical, 8)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
             .background(
                 RoundedRectangle(cornerRadius: 18)
                     .fill((state.isProcessing || state.queue.isEmpty || state.outputFolder == nil || !state.queue.contains(where: { $0.isEnabled })) ? Color.blue.opacity(0.5) : Color.blue)
@@ -195,7 +200,7 @@ struct ContentView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.blue))
                 
                 Button(action: { selectInput(directoriesOnly: true) }) {
@@ -204,7 +209,7 @@ struct ContentView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
                 
                 Spacer()
@@ -215,7 +220,7 @@ struct ContentView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 12).fill(Color(NSColor.controlColor)))
             }
             
@@ -316,7 +321,7 @@ struct ContentView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
                 .disabled(state.logs.isEmpty)
 
@@ -326,7 +331,7 @@ struct ContentView: View {
                         .padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
                 .disabled(state.isProcessing || !state.queue.contains(where: { $0.status == "Failed" }))
             }

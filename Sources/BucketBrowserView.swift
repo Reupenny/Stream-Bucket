@@ -20,6 +20,11 @@ struct BucketBrowserView: View {
     @State private var connectionTestResult = ""
     @State private var isTestingConnection = false
     @State private var isDeleting = false
+    @State private var isDownloading = false
+    @State private var downloadProgressText = ""
+    @State private var downloadProgressValue: Double = 0.0
+    @State private var totalDownloadFiles = 0
+    @State private var doneDownloadFiles = 0
     @State private var checkedItems = Set<S3Object.ID>()
 
     // Editor State
@@ -75,7 +80,7 @@ struct BucketBrowserView: View {
                             Spacer()
                             Button(action: addProfile) {
                                 Image(systemName: "plus")
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(PressablePlainStyle())
                         }
 
                         List(selection: $state.selectedProfileId) {
@@ -167,7 +172,7 @@ struct BucketBrowserView: View {
                                             .contentShape(Rectangle())
                                     }
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(PressableButtonStyle())
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlColor)))
@@ -182,7 +187,7 @@ struct BucketBrowserView: View {
                                         .padding(.vertical, 6)
                                         .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(PressableButtonStyle())
                                 .background(RoundedRectangle(cornerRadius: 8).fill(Color.blue))
                                     .frame(maxWidth: .infinity)
                             }
@@ -230,12 +235,22 @@ struct BucketBrowserView: View {
                 Spacer()
                 
                 if !checkedItems.isEmpty {
+                    Button(action: { downloadSelected() }) {
+                        Label("Download Selected (\(checkedItems.count))", systemImage: "arrow.down.doc")
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .background(RoundedRectangle(cornerRadius: 6).fill(Color.blue.opacity(0.8)))
+                    .foregroundColor(.white)
+                    .disabled(isDeleting || isDownloading)
+                    
                     Button(action: { Task { await deleteSelected() } }) {
                         Label("Delete Selected (\(checkedItems.count))", systemImage: "trash")
                             .padding(.horizontal, 8).padding(.vertical, 4)
                                 .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.8)))
                     .foregroundColor(.white)
                     .disabled(isDeleting)
@@ -246,30 +261,31 @@ struct BucketBrowserView: View {
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
-                .disabled(client == nil || isUploading || isDeleting)
+                .disabled(client == nil || isUploading || isDeleting || isDownloading)
 
                 Button(action: { uploadFiles(files: false, directories: true) }) {
                     Label("Upload Folder", systemImage: "folder.badge.plus")
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
-                .disabled(client == nil || isUploading || isDeleting)
+                .disabled(client == nil || isUploading || isDeleting || isDownloading)
 
                 Button(action: { Task { await refresh() } }) {
                     Image(systemName: "arrow.clockwise")
                         .padding(.horizontal, 8).padding(.vertical, 4)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressablePlainStyle())
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlColor)))
-                .disabled(isLoading || isDeleting)
+                .disabled(isLoading || isDeleting || isDownloading)
             }
 
             // Upload progress bar
+            // §4/§14 Spring-driven, reduced-motion-aware reveal of the upload progress.
             if isUploading {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -285,6 +301,29 @@ struct BucketBrowserView: View {
                         .tint(.blue)
                 }
                 .padding(.vertical, 4)
+                // §4/§14 Spring-driven, reduced-motion-aware reveal of the progress bar.
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(DesignKit.motion(DesignKit.spring), value: isUploading)
+            }
+            
+            // Download progress bar
+            if isDownloading {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(downloadProgressText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(doneDownloadFiles)/\(totalDownloadFiles) files")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    ProgressView(value: downloadProgressValue)
+                        .tint(.blue)
+                }
+                .padding(.vertical, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(DesignKit.motion(DesignKit.spring), value: isDownloading)
             }
 
             // File table
@@ -375,6 +414,12 @@ struct BucketBrowserView: View {
                                         NSPasteboard.general.setString(getURL(for: obj), forType: .string)
                                     } label: {
                                         Label("Copy Link", systemImage: "doc.on.doc")
+                                    }
+                                    
+                                    Button {
+                                        downloadSingleObject(obj)
+                                    } label: {
+                                        Label("Download", systemImage: "arrow.down.doc")
                                     }
                                 }
                                 Button(role: .destructive) {
@@ -722,6 +767,73 @@ struct BucketBrowserView: View {
                 uploadProgressValue = 0
             }
             await refresh()
+        }
+    }
+
+    private func downloadSelected() {
+        guard let c = client else { return }
+        let objectsToDownload = objects.filter { checkedItems.contains($0.id) && !$0.isVirtualFolder }
+        guard !objectsToDownload.isEmpty else { return }
+        
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Select Download Folder"
+        guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
+        
+        performDownload(objects: objectsToDownload, to: destinationURL, client: c)
+    }
+
+    private func downloadSingleObject(_ obj: S3Object) {
+        guard let c = client, !obj.isVirtualFolder else { return }
+        
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = URL(fileURLWithPath: obj.key).lastPathComponent
+        guard panel.runModal() == .OK, let destinationURL = panel.url else { return }
+        
+        performDownload(objects: [obj], to: destinationURL.deletingLastPathComponent(), client: c, singleFileName: destinationURL.lastPathComponent)
+    }
+
+    private func performDownload(objects: [S3Object], to destinationURL: URL, client c: S3Client, singleFileName: String? = nil) {
+        isDownloading = true
+        downloadProgressValue = 0
+        doneDownloadFiles = 0
+        totalDownloadFiles = objects.count
+        
+        Task {
+            for (i, obj) in objects.enumerated() {
+                await MainActor.run {
+                    let fileName = singleFileName ?? URL(fileURLWithPath: obj.key).lastPathComponent
+                    downloadProgressText = "Downloading: \(fileName)"
+                    downloadProgressValue = Double(i) / Double(max(totalDownloadFiles, 1))
+                    doneDownloadFiles = i
+                }
+                
+                let fileName = singleFileName ?? URL(fileURLWithPath: obj.key).lastPathComponent
+                let fileURL = destinationURL.appendingPathComponent(fileName)
+                
+                do {
+                    try await c.downloadObject(path: obj.key, to: fileURL)
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Download failed for \(obj.key): \(error.localizedDescription)"
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                downloadProgressValue = 1.0
+                doneDownloadFiles = totalDownloadFiles
+                downloadProgressText = "Done!"
+            }
+            
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await MainActor.run {
+                isDownloading = false
+                downloadProgressText = ""
+                downloadProgressValue = 0
+            }
         }
     }
 

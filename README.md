@@ -1,6 +1,6 @@
 # Stream Bucket
 
-<img alt="Stream Bucket Icon" src="icon/Stream Bucket feature.png" width="75%">
+<img alt="Stream Bucket Icon" src="icon/Stream Bucket feature.png" width="100%">
 
 Stream Bucket is a powerful macOS desktop application designed to bypass expensive Online Video Platforms (OVPs) like Dacast, Vimeo Live, and YoloCast. By leveraging your own S3 storage, Stream Bucket gives you total ownership of your media, streaming, and CDN costs.
 
@@ -32,6 +32,26 @@ Why Stream Bucket? It turns your cheap cloud storage into a fully functioning, p
 - Backblaze B2, AWS S3, DigitalOcean Spaces, etc.
 - Secure credential storage via macOS Keychain
 - Background upload during processing *Still in production
+
+## 📸 Screenshots
+
+### Convert — Batch VOD Encoding
+
+Queue a whole library of raw video, pick the resolutions you need, and Stream Bucket transcodes to adaptive HLS while uploading straight to your bucket.
+
+<img alt="Stream Bucket Convert tab showing the batch conversion queue and VOD encoding settings" src="Screen%20Shoots/Convert%20screen.png" width="100%">
+
+### Upload — Cloud File Explorer & S3 Connections
+
+Browse, upload, and delete files on your bucket, and manage multiple S3-compatible connections in one place. Credentials are stored in the macOS Keychain.
+
+<img alt="Stream Bucket Upload tab showing the Cloud File Explorer and S3 connection settings" src="Screen%20Shoots/Upload%20Screen%20%28S3%20file%20viewer%29.png" width="100%">
+
+### Live — Live Dashboard with Real-Time Logs
+
+Start the RTMP ingest server, schedule streams.
+
+<img alt="Stream Bucket Live tab showing the Live Dashboard, scheduled streams, and real-time server logs" src="Screen%20Shoots/Live%20Stream%20View.png" width="100%">
 
 [![Buy Me A Coffee](<https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=reubdavern&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff>)](https://www.buymeacoffee.com/reubdavern)
 
