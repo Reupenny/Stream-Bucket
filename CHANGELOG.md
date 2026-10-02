@@ -84,7 +84,11 @@ When upgrading from a previous version:
 
 ### Breaking Changes
 
-None in version 1.0.0
+None in version 0.2.0
+
+> **Note on versioning:** Stream Bucket was previously built and shared under
+> inconsistent `1.0.x` labels that were never published as real releases. `0.1.0`
+> is the first public release, and the version line has been reset to `0.x`.
 
 ---
 

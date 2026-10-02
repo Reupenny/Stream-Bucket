@@ -88,6 +88,29 @@ fi
 DMG_NAME="${APP_NAME// /_}_v${VERSION}.dmg"
 TMP_DMG="$BUILD_DIR/pack.temp.dmg"
 
+# --- Cleanup any volume left mounted by a previous (possibly interrupted) build ---
+# If a stale "Stream Bucket" volume is still attached, macOS mounts the new image
+# as "Stream Bucket 1". Finder's `disk "Stream Bucket"` then targets the OLD
+# volume, so the background/icon settings are written there and silently lost
+# from the DMG we ship. Always start from a known-clean mount state.
+STALE_MOUNT="/Volumes/$APP_NAME"
+if mount | grep -qF " on $STALE_MOUNT "; then
+    echo "Detaching stale volume from a previous build..."
+    hdiutil detach "$STALE_MOUNT" -quiet || hdiutil detach -force "$STALE_MOUNT" -quiet || true
+    sleep 2
+fi
+# Remove the temp image from any earlier run so hdiutil create starts fresh.
+rm -f "$TMP_DMG"
+
+# If this script is interrupted (Ctrl-C) or errors out mid-way, detach the
+# volume so the next build doesn't collide with a stale "Stream Bucket" mount.
+cleanup_build_volume() {
+    if [ -n "${MOUNT_DIR:-}" ] && mount | grep -qF " on $MOUNT_DIR "; then
+        hdiutil detach -force "$MOUNT_DIR" -quiet >/dev/null 2>&1 || true
+    fi
+}
+trap cleanup_build_volume EXIT INT TERM
+
 echo "Creating temporary writeable DMG..."
 # Calculate approximate size needed for the DMG (App size + 20MB padding)
 APP_SIZE=$(du -sm "$APP_DIR" | cut -f1)
@@ -111,48 +134,95 @@ mkdir "$MOUNT_DIR/.background"
 cp "$DMG_BACKGROUND_SOURCE" "$MOUNT_DIR/.background/background.png"
 
 echo "Applying visual layout adjustments via Finder..."
-# Use AppleScript to set window bounds, background, and icon positions
+# Use AppleScript to set window bounds, background, and icon positions.
+# `try`/`on error` is essential: without it a failed `set` (e.g. Finder can't
+# resolve the disk) only prints "execution error" and the build still reports
+# success, producing a DMG with a plain white background.
 osascript <<EOF
 tell application "Finder"
-    set theDisk to disk "$APP_NAME"
-    open theDisk
-    delay 1
-    
-    set containerWindow to container window of theDisk
-    set current view of containerWindow to icon view
-    set toolbar visible of containerWindow to false
-    set statusbar visible of containerWindow to false
-    
-    # Position window (left, top, right, bottom) -> 600x400 window size
-    set the bounds of containerWindow to {400, 100, 1000, 500}
-    
-    set viewOptions to the icon view options of containerWindow
-    set icon size of viewOptions to 120
-    set arrangement of viewOptions to not arranged
-    
-    # Use relative HFS path targeted cleanly directly to the disk object
-    set background picture of viewOptions to file ".background:background.png" of theDisk
-    
-    # Set item positions directly on the disk object
-    set position of item "$APP_NAME.app" of theDisk to {150, 180}
-    set position of item "Applications" of theDisk to {450, 180}
-    
-    # Force Finder to refresh and save its internal cache structure
-    update theDisk
-    delay 5
-    
-    # Closing the window commits the layout modifications into the physical .DS_Store file
-    close containerWindow
-    delay 5
+    try
+        set theDisk to disk "$APP_NAME"
+        open theDisk
+        delay 1
+
+        set containerWindow to container window of theDisk
+        set current view of containerWindow to icon view
+        set toolbar visible of containerWindow to false
+        set statusbar visible of containerWindow to false
+
+        # Position window (left, top, right, bottom) -> 600x400 window size
+        set the bounds of containerWindow to {400, 100, 1000, 500}
+
+        set viewOptions to the icon view options of containerWindow
+        set icon size of viewOptions to 120
+        set arrangement of viewOptions to not arranged
+
+        # Use relative HFS path targeted cleanly directly to the disk object
+        set background picture of viewOptions to file ".background:background.png" of theDisk
+
+        # Set item positions directly on the disk object
+        set position of item "$APP_NAME.app" of theDisk to {150, 180}
+        set position of item "Applications" of theDisk to {450, 180}
+
+        # Force Finder to refresh and save its internal cache structure
+        update theDisk
+        delay 5
+
+        # Closing the window commits the layout modifications into the physical .DS_Store file
+        close containerWindow
+        delay 5
+        return "ok"
+    on error errMsg number errNum
+        return "FINDER_ERROR " & errNum & ": " & errMsg
+    end try
 end tell
 EOF
+
+# Verify the background was actually committed to the volume's .DS_Store.
+# NOTE: Finder's `background picture` property cannot be read back (it always
+# raises -10000 on Finder 27, even when unset), so we verify the artefact we
+# care about instead: the `bwsp` (background window settings) record plus the
+# background.png reference inside .DS_Store.
+if [ ! -f "$MOUNT_DIR/.DS_Store" ]; then
+    echo "Error: no .DS_Store was written to the DMG volume."
+    echo "Aborting so a DMG with a missing background is not published."
+    exit 1
+fi
+
+if ! python3 - "$MOUNT_DIR/.DS_Store" <<'PYCHECK'
+import sys
+data = open(sys.argv[1], 'rb').read()
+text = data.decode('utf-16-le', 'ignore')
+ok = b'bwsp' in data and 'background' in text.lower()
+sys.exit(0 if ok else 1)
+PYCHECK
+then
+    echo "Error: .DS_Store is missing the 'bwsp' background record."
+    echo "Aborting so a DMG with a missing background is not published."
+    exit 1
+fi
+
+echo "Verified: background record (bwsp) present in .DS_Store"
 
 # Flush file system buffers to ensure the written .DS_Store file is solid
 sync
 
 echo "Unmounting temporary DMG..."
-hdiutil detach "$MOUNT_DIR" -quiet
-sleep 5
+# Retry with a forced unmount so a lingering Finder handle cannot leave the
+# volume attached (which would break the *next* build via the name collision).
+hdiutil detach "$MOUNT_DIR" -quiet || hdiutil detach -force "$MOUNT_DIR" -quiet
+sleep 2
+
+# Make sure the volume really is gone before we finish.
+for _ in 1 2 3 4 5; do
+    mount | grep -qF " on $MOUNT_DIR " || break
+    sleep 1
+done
+if mount | grep -qF " on $MOUNT_DIR "; then
+    echo "Warning: $MOUNT_DIR is still mounted; forcing detach."
+    hdiutil detach -force "$MOUNT_DIR" -quiet || true
+    sleep 2
+fi
 
 echo "Compressing and finalizing DMG..."
 # Convert the writeable DMG to a compressed, read-only production DMG
