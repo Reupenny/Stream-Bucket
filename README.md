@@ -86,6 +86,41 @@ Get it on the relase page or build it following the instructions below.
 
 [Release Page](https://github.com/Reupenny/Stream-Bucket/releases)
 
+## Installing & Running
+
+1. Download the latest `.dmg` from the [Release Page](https://github.com/Reupenny/Stream-Bucket/releases)
+2. Open the `.dmg` and drag **Stream Bucket** into your **Applications** folder
+3. Eject the disk image and launch Stream Bucket from Applications
+
+### "Stream Bucket" cannot be opened / damaged
+
+Stream Bucket is distributed **unsigned and unnotarized**, so macOS Gatekeeper blocks
+it on first launch. This is expected — it does not indicate a problem with the app.
+
+To open it:
+
+1. In **Finder**, navigate to **Applications**
+2. **Control-click** (or right-click) **Stream Bucket**
+3. Choose **Open** from the context menu
+4. Click **Open** again in the dialog that appears
+
+macOS remembers this exception, so Stream Bucket launches normally from then on.
+
+> You only need to do this once per app version. If macOS blocks it again after an
+> update, repeat the steps above.
+
+If you prefer, you can also allow it from **System Settings → Privacy & Security**,
+where it will appear under "Security" with an **Open Anyway** button.
+
+### Command-line launch
+
+```bash
+open "/Applications/Stream Bucket.app"
+```
+
+> **Note:** FFmpeg must be installed and available on your `PATH` before processing
+> or streaming. See [Prerequisites](#required-software).
+
 ## Building the Application
 
 ### Build Script
@@ -345,6 +380,12 @@ brew install ffmpeg
 # Verify installation
 ffmpeg -version
 ```
+
+### App won't open ("damaged" or "unverified developer")
+
+Because the app is unsigned and unnotarized, Gatekeeper blocks it on first launch.
+**Control-click** (or right-click) **Stream Bucket** in Applications → **Open** →
+**Open**. See [Installing & Running](#installing--running) for full details.
 
 ### S3 Connection Failed
 

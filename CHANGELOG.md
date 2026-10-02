@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Screenshot gallery in README covering the Convert, Upload, and Live tabs
+- "Installing & Running" section documenting the right-click → Open workaround for
+  Gatekeeper on the unsigned, unnotarized build
 - `DesignKit` helpers for spring-based, interruptible motion that honours the
   system Reduce Motion accessibility setting
 - `PressableButtonStyle` / `PressablePlainStyle` for instant press-down feedback
