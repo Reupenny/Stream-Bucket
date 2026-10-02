@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2] - 2026-10-02
+## [0.2.0] - 2026-10-02
 
 ### Added
 
@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live view and bucket browser UI polish
 - Clarified README wording and restructured the S3 profile configuration section
 
-## [1.0.0] - Initial Release
+## [0.1.0] - Initial Release
 
 ### Added
 
@@ -49,11 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version    | Date       | Description                                |
-| ---------- | ---------- | ------------------------------------------ |
-| 1.0.2      | 2026-10-02 | Screenshots, motion/press-feel UI pass, S3 downloads |
-| 1.0.0      | 2026       | Initial release                            |
-| Unreleased | Current    | Documentation and setup guides             |
+| Version    | Date       | Description                                          |
+| ---------- | ---------- | ---------------------------------------------------- |
+| 0.2.0      | 2026-10-02 | Screenshots, motion/press-feel UI pass, S3 downloads |
+| 0.1.0      | 2026       | Initial release                                      |
+| Unreleased | Current    | Documentation and setup guides                       |
 
 ---
 
@@ -61,7 +61,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned Features
 
-- [ ] Web-based management interface
 - [ ] Scheduled streaming automation
 - [ ] Recording archive management
 - [ ] Analytics dashboard
